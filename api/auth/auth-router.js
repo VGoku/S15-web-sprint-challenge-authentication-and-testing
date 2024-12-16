@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const router = require("express").Router();
 const db = require("../../data/dbConfig.js");
 
-const secret = process.env.SECRET || 'shh'; // Secret key for JWT, fallback if not set in environment
+const secret = process.env.SECRET || "shh"; // Secret key for JWT, fallback if not set in environment
 
 // router.post('/register', (req, res) => {
 //   res.end('implement register, please!');
