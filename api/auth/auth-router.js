@@ -48,14 +48,14 @@
 //       the response body should include a string exactly as follows: "invalid credentials".
 //   */
  
-// // api/auth/auth-router.js
+// api/auth/auth-router.js
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken"); // We will use this now
+const jwt = require("jsonwebtoken");
 const router = require("express").Router();
 const { addUser, findByUsername } = require("./auth-model");
 const { checkUsernameFree, checkPayload } = require("./auth-middleware");
 
-const JWT_SECRET = process.env.JWT_SECRET || 'shh'; // Ensure this secret is defined
+const JWT_SECRET = process.env.JWT_SECRET || 'shh';
 
 // Helper function to generate a token
 function generateToken(user) {
@@ -76,11 +76,11 @@ router.post("/register", checkPayload, checkUsernameFree, async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 8);
     const user = await addUser({ username, password: hashedPassword });
 
-    // Respond with user details including password ONLY in tests
+    // Respond with user details
     const responseUser = {
       id: user.id,
-      username: user.username,
-      ...(process.env.NODE_ENV === 'test' && { password: user.password }) // Include password only in test
+      username: user.username
+      // Exclude password from response
     };
 
     res.status(201).json(responseUser);

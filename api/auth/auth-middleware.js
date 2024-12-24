@@ -1,5 +1,5 @@
 
-// api/auth/auth-middleware.js
+// // api/auth/auth-middleware.js
 const User = require("./auth-model"); // Import the User model to interact with the user data
 
 // Middleware to check if username is already taken
@@ -10,8 +10,8 @@ async function checkUsernameFree(req, res, next) {
     // Check if the username already exists in the database
     const existingUser = await User.findByUsername(username);
     if (existingUser) {
-      // If the username is already taken, send a 400 error with a message
-      return res.status(400).json({ message: "username taken" });
+      // If the username is already taken, send a 409 error with a message
+      return res.status(409).json({ message: "username taken" });
     }
 
     next(); // If no existing user, proceed to the next middleware or route handler
