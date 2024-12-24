@@ -1,14 +1,4 @@
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const router = require("express").Router();
-const db = require("../../data/dbConfig.js");
-
-const secret = process.env.SECRET || "shh"; // Secret key for JWT, fallback if not set in environment
-
-// router.post('/register', (req, res) => {
-//   res.end('implement register, please!');
-
-  /*
+ /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
     DO NOT EXCEED 2^8 ROUNDS OF HASHING!
@@ -33,41 +23,8 @@ const secret = process.env.SECRET || "shh"; // Secret key for JWT, fallback if n
     4- On FAILED registration due to the `username` being taken,
       the response body should include a string exactly as follows: "username taken".
   */
- // Register endpoint
-router.post("/register", async (req, res) => {
-  const { username, password } = req.body;
 
-// Validate input
-if (!username || !password) {
-  return res.status(400).json({ message: "username and password required" });
-}
-
-// Check if username already exists
-const existingUser = await db("users").where({ username }).first();
-if (existingUser) {
-  return res.status(400).json({ message: "username taken" });
-}
-
-// Hash the password
-const hashedPassword = bcrypt.hashSync(password, 8); // 2^8 rounds of hashing
-
-// Insert the new user into the database
-try {
-  const [id] = await db("users").insert({ username, password: hashedPassword });
-  const newUser = await db("users").where({ id }).first();
-  res.status(201).json({
-    id: newUser.id,
-    username: newUser.username,
-    password: newUser.password, // In production, you should never send the password in the response.
-  });
-} catch (err) {
-  res.status(500).json({ message: "Error registering user" });
-}
-});
-
-// router.post('/login', (req, res) => {
-//   res.end('implement login, please!');
-  /*
+      /*
     IMPLEMENT
     You are welcome to build additional middlewares to help with the endpoint's functionality.
 
@@ -90,35 +47,46 @@ try {
     4- On FAILED login due to `username` not existing in the db, or `password` being incorrect,
       the response body should include a string exactly as follows: "invalid credentials".
   */
- // Login endpoint
-router.post("/login", async (req, res) => {
-  const { username, password } = req.body;
+ 
+// api/auth/auth-router.js
+const bcrypt = require("bcryptjs"); // Import bcryptjs for password hashing and comparison
+const jwt = require("jsonwebtoken"); // Import jsonwebtoken for generating JWT tokens
+const router = require("express").Router(); // Create a new router instance from Express
+const { addUser, findByUsername, generateToken } = require("./auth-model"); // Import functions from auth-model
+const { checkUsernameFree, checkPayload } = require("./auth-middleware"); // Import middleware functions
 
-  // Validate input
-  if (!username || !password) {
-    return res.status(400).json({ message: "username and password required" });
+// Register endpoint
+router.post("/register", checkPayload, checkUsernameFree, async (req, res) => {
+  try {
+    const { username, password } = req.body; // Extract username and password from the request body
+    const hashedPassword = await bcrypt.hash(password, 8); // Hash the password with a salt rounds of 8
+    const user = await addUser({ username, password: hashedPassword }); // Add the new user to the database
+    // Respond with the user ID and username upon successful registration
+    res.status(201).json({ id: user.id, username: user.username });
+  } catch (err) {
+    // If an error occurs, send a 500 status with an error message
+    res.status(500).json({ message: "Error creating user" });
   }
-
-  // Check if user exists
-  const user = await db("users").where({ username }).first();
-  if (!user) {
-    return res.status(400).json({ message: "invalid credentials" });
-  }
-
-  // Check if password is correct
-  const passwordMatches = bcrypt.compareSync(password, user.password);
-  if (!passwordMatches) {
-    return res.status(400).json({ message: "invalid credentials" });
-  }
-
-  // Generate JWT token
-  const token = jwt.sign({ userId: user.id }, secret, { expiresIn: "1h" });
-
-  // Return token and success message
-  res.status(200).json({
-    message: `welcome, ${user.username}`,
-    token,
-  });
 });
 
-module.exports = router;
+// Login endpoint
+router.post("/login", checkPayload, async (req, res) => {
+  try {
+    const { username, password } = req.body; // Extract username and password from the request body
+    const user = await findByUsername(username); // Find the user by username
+    if (user && bcrypt.compareSync(password, user.password)) {
+      // If the user exists and the password matches, generate a JWT
+      const token = generateToken(user);
+      // Respond with a success message and the generated token
+      res.status(200).json({ message: `welcome, ${user.username}`, token });
+    } else {
+      // If credentials are invalid, send a 401 Unauthorized response
+      res.status(401).json({ message: "invalid credentials" });
+    }
+  } catch (err) {
+    // If an error occurs, send a 500 status with an error message
+    res.status(500).json({ message: "Error logging in" });
+  }
+});
+
+module.exports = router; // Export the router to be used in other parts of the app
