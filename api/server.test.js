@@ -4,7 +4,7 @@ const server = require("../api/server.js");
 const db = require("../data/dbConfig");
 
 beforeAll(async () => {
-  await db("knex_migrations_lock").del();
+  // await db("knex_migrations_lock").del();
   await db.migrate.rollback();
   await db.migrate.latest();
 });
