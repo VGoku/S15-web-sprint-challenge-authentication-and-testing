@@ -1,27 +1,26 @@
 
-const request = require("supertest"); // Import Supertest for making HTTP requests in tests
-const server = require("../api/server.js"); // Import the server instance
-const db = require("../data/dbConfig"); // Import the database configuration
+const request = require("supertest");
+const server = require("../api/server.js");
+const db = require("../data/dbConfig");
 
 beforeAll(async () => {
-  await db.migrate.rollback(); // Roll back any previous migrations
-  await db.migrate.latest(); // Apply the latest database migrations
+  await db("knex_migrations_lock").del();
+  await db.migrate.rollback();
+  await db.migrate.latest();
 });
 
 afterAll(async () => {
-  await db.destroy(); // Destroy the database connection after all tests
+  await db.destroy();
 });
 
 beforeEach(async () => {
-  await db("users").truncate(); // Truncate the "users" table before each test
+  await db("users").truncate();
 });
 
-// Sanity test to ensure Jest is working
 test("sanity", () => {
-  expect(true).toBe(true); // Check if Jest is working properly
+  expect(true).toBe(true);
 });
 
-// Test the /api/auth/register endpoint
 describe("POST /api/auth/register", () => {
   test("should return 201 and the created user on successful registration", async () => {
     const user = { username: "testUser", password: "password123" };
@@ -30,10 +29,10 @@ describe("POST /api/auth/register", () => {
       .post("/api/auth/register")
       .send(user);
 
-    expect(res.status).toBe(201); // Check if status code is 201
-    expect(res.body).toHaveProperty("id"); // Check if response has the user id
-    expect(res.body).toHaveProperty("username", "testUser"); // Check if response has the correct username
-    // Remove the check for password property to match best practices
+    expect(res.status).toBe(201);
+    expect(res.body).toHaveProperty("id");
+    expect(res.body).toHaveProperty("username", "testUser");
+    expect(res.body).toHaveProperty("password"); // Include password in response for test
   });
 
   test("should return 400 if username or password is missing", async () => {
@@ -41,39 +40,36 @@ describe("POST /api/auth/register", () => {
       .post("/api/auth/register")
       .send({ username: "testUser" }); // Missing password
 
-    expect(res.status).toBe(400); // Check if status code is 400
-    expect(res.body.message).toBe("username and password required"); // Check if the error message is correct
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ message: "username and password required" }); // Ensure exact match
   });
 
   test("should return 409 if username already exists", async () => {
-    // First registration
     await request(server)
       .post("/api/auth/register")
       .send({ username: "testUser", password: "password123" });
 
-    // Second registration with the same username
     const res = await request(server)
       .post("/api/auth/register")
       .send({ username: "testUser", password: "password123" });
 
-    expect(res.status).toBe(409); // Check if status code is 409 for conflict
-    expect(res.body.message).toBe("username taken"); // Check if the error message is correct
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ message: "username taken" }); // Ensure exact match
   });
 });
 
-// Test the /api/auth/login endpoint
 describe("POST /api/auth/login", () => {
   test("should return 200 and a token on successful login", async () => {
     const user = { username: "testUser", password: "password123" };
-    await request(server).post("/api/auth/register").send(user); // Register first
+    await request(server).post("/api/auth/register").send(user);
 
     const res = await request(server)
       .post("/api/auth/login")
       .send(user);
 
-    expect(res.status).toBe(200); // Check if status code is 200
-    expect(res.body).toHaveProperty("message", "welcome, testUser"); // Check if welcome message is correct
-    expect(res.body).toHaveProperty("token"); // Check if token is returned
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("message", "welcome, testUser");
+    expect(res.body).toHaveProperty("token");
   });
 
   test("should return 400 if username or password is missing", async () => {
@@ -81,29 +77,28 @@ describe("POST /api/auth/login", () => {
       .post("/api/auth/login")
       .send({ username: "testUser" }); // Missing password
 
-    expect(res.status).toBe(400); // Check if status code is 400
-    expect(res.body.message).toBe("username and password required"); // Check if the error message is correct
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ message: "username and password required" });
   });
 
   test("should return 401 if username or password is incorrect", async () => {
     const user = { username: "testUser", password: "password123" };
-    await request(server).post("/api/auth/register").send(user); // Register first
+    await request(server).post("/api/auth/register").send(user);
 
     const res = await request(server)
       .post("/api/auth/login")
       .send({ username: "testUser", password: "wrongpassword" });
 
-    expect(res.status).toBe(401); // Check if status code is 401
-    expect(res.body.message).toBe("invalid credentials"); // Check if the error message is correct
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ message: "invalid credentials" });
   });
 });
 
-// Test the /api/jokes endpoint (protected route)
 describe("GET /api/jokes", () => {
   test("should return 401 if token is missing", async () => {
     const res = await request(server).get("/api/jokes");
-    expect(res.status).toBe(401); // Check if status code is 401
-    expect(res.body.message).toBe("token required"); // Check if the error message is correct
+    expect(res.status).toBe(401);
+    expect(res.body.message).toBe("token required");
   });
 
   test("should return 401 if token is invalid", async () => {
@@ -111,7 +106,23 @@ describe("GET /api/jokes", () => {
       .get("/api/jokes")
       .set("Authorization", "Bearer invalidtoken");
 
-    expect(res.status).toBe(401); // Check if status code is 401
-    expect(res.body.message).toBe("token invalid"); // Check if the error message is correct
+    expect(res.status).toBe(401);
+    expect(res.body.message).toBe("token invalid");
+  });
+});
+
+describe("POST /api/auth/register", () => {
+  test("[21]should return 201 and the created user with a hashed password on successful registration", async () => {
+    const user = { username: "foo", password: "password123" };
+
+    const res = await request(server)
+      .post("/api/auth/register")
+      .send(user);
+
+    expect(res.status).toBe(201); // Check if status code is 201
+    expect(res.body).toHaveProperty("id"); // Check if response has the user id
+    expect(res.body).toHaveProperty("username", "foo"); // Check if response has the correct username
+    expect(res.body).toHaveProperty("password"); // Check if password is included
+    expect(res.body.password).not.toBe("password123"); // Ensure the password is hashed and not plain text
   });
 });

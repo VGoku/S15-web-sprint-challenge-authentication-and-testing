@@ -47,15 +47,14 @@
 // //     4- On FAILED login due to `username` not existing in the db, or `password` being incorrect,
 // //       the response body should include a string exactly as follows: "invalid credentials".
 // //   */
- 
-// // api/auth/auth-router.js
+
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const router = require("express").Router();
 const { addUser, findByUsername } = require("./auth-model");
 const { checkUsernameFree, checkPayload } = require("./auth-middleware");
 
-const JWT_SECRET = process.env.JWT_SECRET || 'shh';
+const JWT_SECRET = process.env.JWT_SECRET || "shh";
 
 // Helper function to generate a token
 function generateToken(user) {
@@ -64,7 +63,7 @@ function generateToken(user) {
     username: user.username,
   };
   const options = {
-    expiresIn: '1d',
+    expiresIn: "1d",
   };
   return jwt.sign(payload, JWT_SECRET, options);
 }
@@ -76,15 +75,16 @@ router.post("/register", checkPayload, checkUsernameFree, async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 8);
     const user = await addUser({ username, password: hashedPassword });
 
-    // Respond with user details including password ONLY in the testing environment
+    // Respond with user details
     const responseUser = {
       id: user.id,
       username: user.username,
-      ...(process.env.NODE_ENV === 'testing' && { password: user.password }) // Include password only in test environment
+      password: hashedPassword // Include password in response for testing purposes
     };
 
     res.status(201).json(responseUser);
   } catch (err) {
+    console.error(err); // Log error for debugging
     res.status(500).json({ message: "Error creating user" });
   }
 });
@@ -94,13 +94,14 @@ router.post("/login", checkPayload, async (req, res) => {
   try {
     const { username, password } = req.body;
     const user = await findByUsername(username);
-    if (user && bcrypt.compareSync(password, user.password)) {
+    if (user && bcrypt.compareSync(password, user.password)) { // Ensure correct comparison
       const token = generateToken(user);
       res.status(200).json({ message: `welcome, ${user.username}`, token });
     } else {
       res.status(401).json({ message: "invalid credentials" });
     }
   } catch (err) {
+    console.error(err); // Log error for debugging
     res.status(500).json({ message: "Error logging in" });
   }
 });

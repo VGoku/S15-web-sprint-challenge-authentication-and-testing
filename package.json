@@ -25,6 +25,7 @@
     "helmet": "5.0.2",
     "jsonwebtoken": "^9.0.2",
     "knex": "2.0.0",
+    "sequelize": "^6.37.5",
     "sqlite3": "5.0.8"
   },
   "devDependencies": {
